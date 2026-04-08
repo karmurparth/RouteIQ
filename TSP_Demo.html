@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TSP Route Optimizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-card: #273552;
+      --bg-input: #334155;
+      --accent: #38bdf8;
+      --accent-hover: #22d3ee;
+      --green: #22c55e;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --purple: #a78bfa;
+      --yellow: #fbbf24;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --border: #334155;
+      --shadow: 0 4px 24px rgba(0,0,0,0.3);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    .app { display: flex; height: 100vh; }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      width: 360px;
+      background: var(--bg-secondary);
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      z-index: 10;
+      transition: transform 0.3s ease;
+    }
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; color: white;
+    }
+
+    /* ===== SEARCH ===== */
+    .search-section {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .search-box { position: relative; }
+    .search-box input {
+      width: 100%;
+      padding: 12px 16px 12px 42px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-box input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+    }
+    .search-box input::placeholder { color: var(--text-muted); }
+    .search-icon {
+      position: absolute;
+      left: 14px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .search-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    /* Custom autocomplete dropdown */
+    .autocomplete-dropdown {
+      position: absolute;
+      top: calc(100% - 8px);
+      left: 20px; right: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow);
+      z-index: 100;
+      display: none;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+    .autocomplete-dropdown.show { display: block; }
+    .ac-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      transition: background 0.15s;
+    }
+    .ac-item:hover { background: rgba(56,189,248,0.08); }
+    .ac-item:last-child { border-bottom: none; }
+    .ac-main {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ac-secondary {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ac-loading, .ac-empty {
+      padding: 16px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ===== STOP LIST ===== */
+    .stop-list-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px;
+    }
+    .stop-list-container::-webkit-scrollbar { width: 4px; }
+    .stop-list-container::-webkit-scrollbar-track { background: transparent; }
+    .stop-list-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .stop-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      margin-bottom: 6px;
+      animation: slideIn 0.25s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-12px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .stop-badge {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: white;
+      flex-shrink: 0;
+    }
+    .stop-badge.start { background: var(--green); }
+    .stop-badge.end { background: var(--red); }
+    .stop-badge.mid { background: var(--blue); }
+    .stop-badge.order { background: var(--purple); }
+
+    .stop-details { flex: 1; min-width: 0; }
+    .stop-name {
+      font-size: 13px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .stop-coords {
+      font-size: 10px; color: var(--text-muted); margin-top: 2px;
+    }
+    .stop-delete {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: transparent; border: none;
+      color: var(--text-muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: all 0.15s; flex-shrink: 0;
+    }
+    .stop-delete:hover { background: rgba(239,68,68,0.15); color: var(--red); }
+
+    .connector-line {
+      width: 2px; height: 12px;
+      background: var(--border);
+      margin: -3px 0 -3px 27px;
+    }
+
+    .empty-state {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 20px; text-align: center; flex: 1;
+    }
+    .empty-icon {
+      width: 56px; height: 56px;
+      background: var(--bg-card); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; margin-bottom: 16px; color: var(--text-muted);
+    }
+    .empty-state h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .empty-state p { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+
+    /* ===== CONTROLS ===== */
+    .controls {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .control-row { display: flex; gap: 8px; }
+    .algo-select {
+      flex: 1;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 13px; font-family: 'Inter', sans-serif;
+      cursor: pointer; outline: none;
+    }
+    .algo-select:focus { border-color: var(--accent); }
+
+    .btn {
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      border: none; font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: 'Inter', sans-serif;
+      transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-primary {
+      flex: 1;
+      background: linear-gradient(135deg, var(--accent), #818cf8);
+      color: white;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(56,189,248,0.3); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .btn-secondary {
+      background: var(--bg-input); color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: var(--bg-card); color: var(--text-primary); }
+
+    .btn-maps {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white; display: none;
+    }
+    .btn-maps:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(34,197,94,0.3); }
+
+    /* ===== RESULT PANEL ===== */
+    .result-panel {
+      display: none;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-primary);
+    }
+    .result-header {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 12px;
+    }
+    .result-header h3 { font-size: 13px; font-weight: 600; }
+    .result-algo-tag {
+      font-size: 10px; padding: 3px 8px;
+      background: var(--bg-card); border-radius: 20px;
+      color: var(--accent); font-weight: 600;
+    }
+    .result-stats {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+    }
+    .stat-item {
+      text-align: center; background: var(--bg-card);
+      border-radius: var(--radius-sm); padding: 10px 8px;
+    }
+    .stat-value {
+      font-size: 20px; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-label {
+      font-size: 9px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px;
+    }
+    .route-flow {
+      margin-top: 12px; display: flex; flex-wrap: wrap;
+      align-items: center; gap: 4px;
+    }
+    .flow-node {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 700; color: white;
+    }
+    .flow-arrow { color: var(--text-muted); font-size: 10px; }
+
+    /* ===== TOAST ===== */
+    .status-toast {
+      position: fixed; top: 16px; left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      padding: 10px 20px; border-radius: var(--radius);
+      font-size: 13px; font-weight: 500; z-index: 1000;
+      transition: transform 0.3s ease; box-shadow: var(--shadow);
+    }
+    .status-toast.show { transform: translateX(-50%) translateY(0); }
+    .status-toast.loading { background: #1e40af; color: white; }
+    .status-toast.success { background: #166534; color: white; }
+    .status-toast.error { background: #991b1b; color: white; }
+
+    /* ===== MAP ===== */
+    .map-container { flex: 1; position: relative; }
+    #map { width: 100%; height: 100%; }
+
+    /* ===== MOBILE ===== */
+    .mobile-toggle {
+      display: none;
+      position: fixed; bottom: 20px; right: 20px;
+      width: 52px; height: 52px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      border: none; color: white; font-size: 22px; cursor: pointer;
+      box-shadow: 0 4px 20px rgba(56,189,248,0.4); z-index: 20;
+      transition: transform 0.2s;
+      align-items: center; justify-content: center;
+    }
+    .mobile-toggle:active { transform: scale(0.92); }
+
+    .mobile-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 9;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        width: 100%; height: 75vh;
+        border-right: none; border-top: 1px solid var(--border);
+        border-radius: 20px 20px 0 0;
+        transform: translateY(100%);
+        box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
+      }
+      .sidebar.open { transform: translateY(0); }
+      .sidebar-header {
+        padding: 12px 20px; position: relative;
+      }
+      .sidebar-header::before {
+        content: ''; display: block;
+        width: 40px; height: 4px;
+        background: var(--text-muted); border-radius: 4px;
+        margin: 0 auto 10px;
+      }
+      .mobile-toggle { display: flex; }
+      .mobile-overlay.show { display: block; }
+      .map-container { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h1>
+        <span class="logo-icon">R</span>
+        Route Optimizer
+      </h1>
+    </div>
+
+    <div class="search-section">
+      <div class="search-box">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="searchInput" placeholder="Search a location to add..." autocomplete="off">
+      </div>
+      <div class="search-hint">Search by name or click anywhere on the map. First = Start, last = End.</div>
+      <div class="autocomplete-dropdown" id="acDropdown"></div>
+    </div>
+
+    <div class="stop-list-container" id="stopListContainer">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+        </div>
+        <h3>No stops added</h3>
+        <p>Search for a location above or<br>tap anywhere on the map to begin.</p>
+      </div>
+    </div>
+
+    <div class="result-panel" id="resultPanel">
+      <div class="result-header">
+        <h3>Route Summary</h3>
+        <span class="result-algo-tag" id="resAlgoTag">--</span>
+      </div>
+      <div class="result-stats">
+        <div class="stat-item">
+          <div class="stat-value" id="resDist">--</div>
+          <div class="stat-label">km</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="resTime">--</div>
+          <div class="stat-label">min</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="resStops">--</div>
+          <div class="stat-label">stops</div>
+        </div>
+      </div>
+      <div class="route-flow" id="routeFlow"></div>
+    </div>
+
+    <div class="controls">
+      <div class="control-row">
+        <select class="algo-select" id="algo">
+          <option value="nn">Nearest Neighbor</option>
+          <option value="2opt">2-Opt Improvement</option>
+          <option value="3opt">3-Opt Improvement</option>
+          <option value="lk" selected>Lin-Kernighan (Best)</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <button class="btn btn-primary" id="btnSolve" onclick="solve()">Optimize Route</button>
+        <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+      </div>
+      <div class="control-row">
+        <button class="btn btn-maps" id="btnMaps" onclick="openInMaps()" style="flex:1;">Open in Google Maps</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="map-container">
+    <div id="map"></div>
+  </div>
+</div>
+
+<button class="mobile-toggle" id="mobileToggle" onclick="toggleSidebar()">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+</button>
+<div class="mobile-overlay" id="mobileOverlay" onclick="toggleSidebar()"></div>
+
+<div class="status-toast" id="statusToast"></div>
+
+<!-- Only load geometry library (no legacy places) -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCR_Sbo3LanEb3qSJ64oK2JAb8jarOLHok&libraries=geometry"></script>
+
+<script>
+const API_KEY = "AIzaSyCR_Sbo3LanEb3qSJ64oK2JAb8jarOLHok";
+
+let map, polyline;
+let markers = [];
+let matrix = [];
+let lastRoute = null;
+let statusTimeout;
+let searchDebounce;
+
+// ===== INIT =====
+function initMap() {
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: 23.0225, lng: 72.5714 },
+    zoom: 12,
+    disableDefaultUI: false,
+    zoomControl: true,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    styles: [
+      { elementType: "geometry", stylers: [{ color: "#1d2c4d" }] },
+      { elementType: "labels.text.fill", stylers: [{ color: "#8ec3b9" }] },
+      { elementType: "labels.text.stroke", stylers: [{ color: "#1a3646" }] },
+      { featureType: "administrative.country", elementType: "geometry.stroke", stylers: [{ color: "#4b6878" }] },
+      { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#1b3044" }] },
+      { featureType: "poi", elementType: "geometry", stylers: [{ color: "#243f5a" }] },
+      { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#6f9ba5" }] },
+      { featureType: "road", elementType: "geometry", stylers: [{ color: "#304a7d" }] },
+      { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#98a5be" }] },
+      { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#2c6675" }] },
+      { featureType: "transit", elementType: "labels.text.fill", stylers: [{ color: "#98a5be" }] },
+      { featureType: "water", elementType: "geometry", stylers: [{ color: "#0e1626" }] },
+      { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4e6d70" }] }
+    ]
+  });
+
+  map.addListener("click", (e) => addPoint(e.latLng, null));
+  setupSearch();
+}
+
+// ===== PLACES AUTOCOMPLETE (New REST API) =====
+function setupSearch() {
+  const input = document.getElementById("searchInput");
+  const dropdown = document.getElementById("acDropdown");
+
+  input.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    const query = input.value.trim();
+    if (query.length < 2) { dropdown.classList.remove("show"); return; }
+    searchDebounce = setTimeout(() => searchPlaces(query), 300);
+  });
+
+  input.addEventListener("focus", () => {
+    if (input.value.trim().length >= 2) {
+      dropdown.classList.add("show");
+    }
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".search-section")) {
+      dropdown.classList.remove("show");
+    }
+  });
+}
+
+async function searchPlaces(query) {
+  const dropdown = document.getElementById("acDropdown");
+  dropdown.innerHTML = '<div class="ac-loading">Searching...</div>';
+  dropdown.classList.add("show");
+
+  try {
+    const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": API_KEY
+      },
+      body: JSON.stringify({
+        input: query,
+        locationBias: {
+          circle: {
+            center: {
+              latitude: map.getCenter().lat(),
+              longitude: map.getCenter().lng()
+            },
+            radius: 50000
+          }
+        }
+      })
+    });
+
+    if (!res.ok) {
+      console.error("Places Autocomplete error:", await res.text());
+      dropdown.innerHTML = '<div class="ac-empty">Search unavailable</div>';
+      return;
+    }
+
+    const data = await res.json();
+    const suggestions = data.suggestions || [];
+
+    if (suggestions.length === 0) {
+      dropdown.innerHTML = '<div class="ac-empty">No results found</div>';
+      return;
+    }
+
+    dropdown.innerHTML = suggestions.map((s, i) => {
+      const place = s.placePrediction;
+      if (!place) return "";
+      const main = place.structuredFormat?.mainText?.text || place.text?.text || "Unknown";
+      const secondary = place.structuredFormat?.secondaryText?.text || "";
+      return `
+        <div class="ac-item" data-place-id="${place.placeId}" data-index="${i}">
+          <div class="ac-main">${main}</div>
+          ${secondary ? `<div class="ac-secondary">${secondary}</div>` : ""}
+        </div>`;
+    }).join("");
+
+    // Add click handlers
+    dropdown.querySelectorAll(".ac-item").forEach(item => {
+      item.addEventListener("click", () => selectPlace(item.dataset.placeId, item.querySelector(".ac-main").textContent));
+    });
+
+  } catch (err) {
+    console.error("Search error:", err);
+    dropdown.innerHTML = '<div class="ac-empty">Search failed</div>';
+  }
+}
+
+async function selectPlace(placeId, name) {
+  const dropdown = document.getElementById("acDropdown");
+  const input = document.getElementById("searchInput");
+
+  dropdown.classList.remove("show");
+  input.value = "";
+
+  try {
+    // Get place details (location) using new Places API
+    const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+      headers: {
+        "X-Goog-Api-Key": API_KEY,
+        "X-Goog-FieldMask": "displayName,location"
+      }
+    });
+
+    if (!res.ok) {
+      console.error("Place details error:", await res.text());
+      showToast("Could not get location details", "error");
+      return;
+    }
+
+    const data = await res.json();
+    const loc = data.location;
+
+    if (!loc) {
+      showToast("No location data for this place", "error");
+      return;
+    }
+
+    const latLng = new google.maps.LatLng(loc.latitude, loc.longitude);
+    const displayName = data.displayName?.text || name;
+
+    map.panTo(latLng);
+    if (map.getZoom() < 13) map.setZoom(13);
+
+    addPoint(latLng, displayName);
+
+  } catch (err) {
+    console.error("Select place error:", err);
+    showToast("Failed to add location", "error");
+  }
+}
+
+// ===== POINTS =====
+function addPoint(latLng, name) {
+  const marker = new google.maps.Marker({
+    position: latLng,
+    map,
+    animation: google.maps.Animation.DROP
+  });
+
+  const lat = latLng.lat();
+  const lng = latLng.lng();
+  const label = name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+  markers.push({ lat, lng, marker, name: label });
+  refreshMarkers();
+  refreshStopList();
+  hideResult();
+}
+
+function removeStop(index) {
+  markers[index].marker.setMap(null);
+  markers.splice(index, 1);
+  refreshMarkers();
+  refreshStopList();
+  hideResult();
+}
+
+function clearAll() {
+  markers.forEach(m => m.marker.setMap(null));
+  markers = [];
+  matrix = [];
+  lastRoute = null;
+  if (polyline) polyline.setMap(null);
+  polyline = null;
+  refreshStopList();
+  hideResult();
+  document.getElementById("btnMaps").style.display = "none";
+}
+
+function refreshMarkers() {
+  const n = markers.length;
+  markers.forEach((m, i) => {
+    let color, label;
+    if (i === 0) { color = "#22c55e"; label = "S"; }
+    else if (i === n - 1 && n > 1) { color = "#ef4444"; label = "E"; }
+    else { color = "#3b82f6"; label = String(i); }
+
+    m.marker.setIcon({
+      path: google.maps.SymbolPath.CIRCLE,
+      fillColor: color, fillOpacity: 1,
+      strokeWeight: 3, strokeColor: "#fff", scale: 14
+    });
+    m.marker.setLabel({ text: label, color: "#fff", fontWeight: "bold", fontSize: "11px" });
+  });
+}
+
+// ===== STOP LIST =====
+function refreshStopList() {
+  const container = document.getElementById("stopListContainer");
+  const empty = document.getElementById("emptyState");
+
+  if (markers.length === 0) {
+    container.innerHTML = "";
+    container.appendChild(empty);
+    empty.style.display = "flex";
+    return;
+  }
+
+  let html = "";
+  markers.forEach((m, i) => {
+    let badgeClass, roleLabel, badgeText;
+    if (i === 0) { badgeClass = "start"; roleLabel = "START"; badgeText = "S"; }
+    else if (i === markers.length - 1 && markers.length > 1) { badgeClass = "end"; roleLabel = "END"; badgeText = "E"; }
+    else { badgeClass = "mid"; roleLabel = `Stop ${i}`; badgeText = i; }
+
+    if (i > 0) html += '<div class="connector-line"></div>';
+
+    html += `
+      <div class="stop-card">
+        <div class="stop-badge ${badgeClass}">${badgeText}</div>
+        <div class="stop-details">
+          <div class="stop-name" title="${m.name}">${m.name}</div>
+          <div class="stop-coords">${roleLabel} &middot; ${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}</div>
+        </div>
+        <button class="stop-delete" onclick="removeStop(${i})" title="Remove stop">&times;</button>
+      </div>`;
+  });
+  container.innerHTML = html;
+}
+
+// ===== UI HELPERS =====
+function hideResult() {
+  document.getElementById("resultPanel").style.display = "none";
+}
+
+function showResult(distKm, timeMins, stops, algoName, route) {
+  const panel = document.getElementById("resultPanel");
+  panel.style.display = "block";
+  document.getElementById("resDist").textContent = distKm.toFixed(1);
+  document.getElementById("resTime").textContent = timeMins.toFixed(0);
+  document.getElementById("resStops").textContent = stops;
+  document.getElementById("resAlgoTag").textContent = algoName;
+
+  const flow = document.getElementById("routeFlow");
+  let html = "";
+  route.forEach((idx, pos) => {
+    let cls, label;
+    if (pos === 0) { cls = "start"; label = "S"; }
+    else if (pos === route.length - 1) { cls = "end"; label = "E"; }
+    else { cls = "order"; label = idx; }
+    if (pos > 0) html += '<span class="flow-arrow">&#8594;</span>';
+    html += `<span class="flow-node ${cls}">${label}</span>`;
+  });
+  flow.innerHTML = html;
+}
+
+function showToast(msg, type = "loading") {
+  const toast = document.getElementById("statusToast");
+  toast.textContent = msg;
+  toast.className = "status-toast " + type + " show";
+  clearTimeout(statusTimeout);
+  if (type !== "loading") {
+    statusTimeout = setTimeout(() => toast.classList.remove("show"), 3000);
+  }
+}
+function hideToast() {
+  document.getElementById("statusToast").classList.remove("show");
+}
+
+function toggleSidebar() {
+  document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("mobileOverlay").classList.toggle("show");
+}
+
+// ===== DISTANCE MATRIX =====
+async function buildMatrix() {
+  const url = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix";
+  const n = markers.length;
+  matrix = Array(n).fill(0).map(() => Array(n).fill(null));
+
+  const body = {
+    origins: markers.map(m => ({ waypoint: { location: { latLng: { latitude: m.lat, longitude: m.lng } } } })),
+    destinations: markers.map(m => ({ waypoint: { location: { latLng: { latitude: m.lat, longitude: m.lng } } } })),
+    travelMode: "DRIVE"
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": API_KEY,
+      "X-Goog-FieldMask": "originIndex,destinationIndex,duration,distanceMeters"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Matrix API Error:", errText);
+    return false;
+  }
+
+  const text = await res.text();
+  let entries = [];
+  try {
+    const parsed = JSON.parse(text);
+    entries = Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    for (let line of text.split("\n")) {
+      line = line.trim();
+      if (!line) continue;
+      try { entries.push(JSON.parse(line)); } catch {}
+    }
+  }
+
+  for (const obj of entries) {
+    if (obj.originIndex !== undefined && obj.destinationIndex !== undefined && obj.duration) {
+      matrix[obj.originIndex][obj.destinationIndex] = {
+        time: parseFloat(String(obj.duration).replace("s", "")),
+        dist: obj.distanceMeters || 0
+      };
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (!matrix[i][j]) matrix[i][j] = { time: i === j ? 0 : 999999, dist: 0 };
+    }
+  }
+  return true;
+}
+
+// ===== ROUTE METRICS =====
+function routeTime(route) {
+  let t = 0;
+  for (let i = 0; i < route.length - 1; i++) t += matrix[route[i]][route[i + 1]].time;
+  return t;
+}
+
+// ===== TSP ALGORITHMS (Fixed Start=0, End=N-1) =====
+function nearestNeighbor() {
+  const n = markers.length;
+  const endIdx = n - 1;
+  if (n <= 2) return n === 1 ? [0] : [0, endIdx];
+  if (n === 3) return [0, 1, endIdx];
+
+  let visited = new Array(n).fill(false);
+  let route = [0];
+  visited[0] = true;
+  visited[endIdx] = true;
+
+  for (let step = 0; step < n - 2; step++) {
+    let last = route[route.length - 1];
+    let best = -1, bestD = Infinity;
+    for (let j = 0; j < n; j++) {
+      if (!visited[j] && matrix[last][j].time < bestD) {
+        bestD = matrix[last][j].time;
+        best = j;
+      }
+    }
+    if (best === -1) break;
+    route.push(best);
+    visited[best] = true;
+  }
+  route.push(endIdx);
+  return route;
+}
+
+function reverseSegment(arr, i, j) {
+  while (i < j) { [arr[i], arr[j]] = [arr[j], arr[i]]; i++; j--; }
+}
+
+function twoOpt(route) {
+  route = [...route];
+  const len = route.length;
+  if (len <= 3) return route;
+  let improved = true;
+  while (improved) {
+    improved = false;
+    for (let i = 1; i < len - 2; i++) {
+      for (let j = i + 1; j < len - 1; j++) {
+        const before = matrix[route[i - 1]][route[i]].time + matrix[route[j]][route[j + 1]].time;
+        const after = matrix[route[i - 1]][route[j]].time + matrix[route[i]][route[j + 1]].time;
+        if (after < before - 0.001) {
+          reverseSegment(route, i, j);
+          improved = true;
+        }
+      }
+    }
+  }
+  return route;
+}
+
+function orOpt(route) {
+  route = [...route];
+  if (route.length <= 4) return route;
+  let improved = true;
+  while (improved) {
+    improved = false;
+    for (let i = 1; i < route.length - 1; i++) {
+      const prev = route[i - 1], cur = route[i], next = route[i + 1];
+      const removeCost = matrix[prev][cur].time + matrix[cur][next].time - matrix[prev][next].time;
+      for (let j = 1; j < route.length - 1; j++) {
+        if (j === i || j === i - 1) continue;
+        const a = route[j], b = route[j + 1];
+        const insertCost = matrix[a][cur].time + matrix[cur][b].time - matrix[a][b].time;
+        if (insertCost < removeCost - 0.001) {
+          route.splice(i, 1);
+          const insertIdx = j > i ? j : j + 1;
+          route.splice(insertIdx, 0, cur);
+          improved = true;
+          break;
+        }
+      }
+      if (improved) break;
+    }
+  }
+  return route;
+}
+
+function threeOpt(route) {
+  route = twoOpt(route);
+  route = orOpt(route);
+  route = twoOpt(route);
+  return route;
+}
+
+function linKernighan(route) {
+  let bestRoute = threeOpt(route);
+  let bestDist = routeTime(bestRoute);
+  if (bestRoute.length <= 4) return bestRoute;
+  const maxAttempts = Math.min(bestRoute.length * 5, 100);
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    let candidate = [...bestRoute];
+    const interiorLen = candidate.length - 2;
+    for (let s = 0; s < 2; s++) {
+      let a = 1 + Math.floor(Math.random() * interiorLen);
+      let b = 1 + Math.floor(Math.random() * interiorLen);
+      if (a !== b) [candidate[a], candidate[b]] = [candidate[b], candidate[a]];
+    }
+    candidate = threeOpt(candidate);
+    const d = routeTime(candidate);
+    if (d < bestDist - 0.001) {
+      bestDist = d;
+      bestRoute = candidate;
+    }
+  }
+  return bestRoute;
+}
+
+// ===== DRAW ROUTE =====
+async function drawRoute(order) {
+  const url = "https://routes.googleapis.com/directions/v2:computeRoutes";
+  const body = {
+    origin: { location: { latLng: { latitude: markers[order[0]].lat, longitude: markers[order[0]].lng } } },
+    destination: { location: { latLng: { latitude: markers[order[order.length - 1]].lat, longitude: markers[order[order.length - 1]].lng } } },
+    intermediates: order.slice(1, -1).map(i => ({
+      location: { latLng: { latitude: markers[i].lat, longitude: markers[i].lng } }
+    })),
+    travelMode: "DRIVE",
+    routingPreference: "TRAFFIC_AWARE"
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": API_KEY,
+      "X-Goog-FieldMask": "routes.polyline.encodedPolyline,routes.duration,routes.distanceMeters"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    console.error("Routes API Error:", await res.text());
+    return null;
+  }
+
+  const data = await res.json();
+  if (!data.routes || !data.routes.length) {
+    console.error("No routes returned:", data);
+    return null;
+  }
+
+  const routeData = data.routes[0];
+  const path = google.maps.geometry.encoding.decodePath(routeData.polyline.encodedPolyline);
+
+  if (polyline) polyline.setMap(null);
+  polyline = new google.maps.Polyline({
+    path, map,
+    strokeColor: "#38bdf8",
+    strokeWeight: 5,
+    strokeOpacity: 0.9
+  });
+
+  const bounds = new google.maps.LatLngBounds();
+  path.forEach(p => bounds.extend(p));
+  map.fitBounds(bounds, { top: 50, bottom: 50, left: 380, right: 50 });
+
+  return {
+    distMeters: routeData.distanceMeters || 0,
+    durationSec: parseFloat(String(routeData.duration || "0").replace("s", ""))
+  };
+}
+
+// ===== OPEN IN GOOGLE MAPS =====
+function openInMaps() {
+  if (!lastRoute || lastRoute.length < 2) return;
+  const start = markers[lastRoute[0]];
+  const end = markers[lastRoute[lastRoute.length - 1]];
+  const waypoints = lastRoute.slice(1, -1).map(i => `${markers[i].lat},${markers[i].lng}`);
+  let url = `https://www.google.com/maps/dir/?api=1`;
+  url += `&origin=${start.lat},${start.lng}`;
+  url += `&destination=${end.lat},${end.lng}`;
+  url += `&travelmode=driving`;
+  if (waypoints.length > 0) url += `&waypoints=${waypoints.join("|")}`;
+  window.open(url, "_blank");
+}
+
+// ===== SOLVE =====
+const ALGO_NAMES = { nn: "Nearest Neighbor", "2opt": "2-Opt", "3opt": "3-Opt", lk: "Lin-Kernighan" };
+
+async function solve() {
+  if (markers.length < 2) { showToast("Add at least 2 stops (Start + End)", "error"); return; }
+
+  const btn = document.getElementById("btnSolve");
+  btn.disabled = true;
+
+  showToast("Building distance matrix...", "loading");
+  const matrixOk = await buildMatrix();
+  if (!matrixOk) {
+    showToast("Matrix API failed. Check console.", "error");
+    btn.disabled = false;
+    return;
+  }
+
+  showToast("Running optimization...", "loading");
+  const algo = document.getElementById("algo").value;
+  const nnRoute = nearestNeighbor();
+  let route;
+  if (algo === "nn") route = nnRoute;
+  if (algo === "2opt") route = twoOpt([...nnRoute]);
+  if (algo === "3opt") route = threeOpt([...nnRoute]);
+  if (algo === "lk") route = linKernighan([...nnRoute]);
+
+  lastRoute = route;
+
+  showToast("Drawing route...", "loading");
+  const info = await drawRoute(route);
+  btn.disabled = false;
+
+  if (!info) { showToast("Could not draw route.", "error"); return; }
+
+  const distKm = info.distMeters / 1000;
+  const timeMins = info.durationSec / 60;
+
+  showResult(distKm, timeMins, route.length, ALGO_NAMES[algo], route);
+  document.getElementById("btnMaps").style.display = "flex";
+
+  showToast(`Route optimized with ${ALGO_NAMES[algo]}`, "success");
+  console.log("Route:", route, `| ${distKm.toFixed(1)} km | ${timeMins.toFixed(0)} min`);
+}
+
+initMap();
+</script>
+</body>
+</html>
